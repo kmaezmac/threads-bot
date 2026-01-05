@@ -1,0 +1,24 @@
+{
+  "name": "threads-bot",
+  "version": "1.0.0",
+  "description": "Threads API auto-posting bot for Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "threads",
+    "api",
+    "bot",
+    "vercel"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}
