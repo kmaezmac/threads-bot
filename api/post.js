@@ -158,6 +158,10 @@ module.exports = async (req, res) => {
       }
 
       containerId = createData.id;
+
+      // メディア処理のための待機時間（画像の場合は3秒、動画の場合は10秒）
+      const waitTime = mediaType === 'VIDEO' ? 10000 : 3000;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     } else {
       // テキストのみの投稿
       const createResponse = await fetch(
