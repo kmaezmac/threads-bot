@@ -1,8 +1,10 @@
 const fetch = require('node-fetch');
+const axios = require('axios');
 
 /**
  * Threads API投稿エンドポイント
  * Vercel Serverless Function
+ * useRakuten=trueの場合、楽天APIから商品を取得して投稿
  */
 module.exports = async (req, res) => {
   // CORSヘッダー設定
@@ -20,13 +22,85 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // POSTメソッドのみ許可
-  if (req.method !== 'POST') {
+  // GETとPOSTメソッドを許可
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { text, mediaUrl, mediaType } = req.body;
+    // GETの場合はクエリパラメータ、POSTの場合はボディから取得
+    let text, mediaUrl, mediaType, useRakuten;
+
+    if (req.method === 'GET') {
+      text = req.query.text;
+      mediaUrl = req.query.mediaUrl;
+      mediaType = req.query.mediaType;
+      useRakuten = req.query.useRakuten;
+    } else {
+      ({ text, mediaUrl, mediaType, useRakuten } = req.body);
+    }
+
+    // デフォルトで楽天APIを使用（textが指定されている場合は除く）
+    // useRakuten=falseで明示的に無効化できる
+    const shouldUseRakuten = !text && useRakuten !== 'false' && useRakuten !== false;
+
+    // 楽天APIから商品を取得
+    let rakutenItem = null;
+    if (shouldUseRakuten || useRakuten === true || useRakuten === 'true') {
+      // 年齢層のランダム選択
+      const ages = [20, 30, 40];
+      const age = ages[Math.floor(Math.random() * ages.length)];
+
+      // ページのランダム選択
+      const random = Math.floor(Math.random() * 34) + 1;
+
+      // 楽天APIのリクエストURL構築
+      const requestUrl = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601?applicationId=${process.env.RAKUTEN_APP_ID}&age=${age}&sex=1&carrier=0&page=${random}`;
+
+      try {
+        const rakutenResponse = await axios.get(requestUrl);
+
+        if (rakutenResponse.status === 200 && rakutenResponse.data.Items && rakutenResponse.data.Items.length > 0) {
+          // ランダムに商品を選択
+          const randomNo = Math.floor(Math.random() * rakutenResponse.data.Items.length);
+          const item = rakutenResponse.data.Items[randomNo].Item;
+
+          // 画像URLから解像度指定パラメータを削除
+          let imageUrl = item.imageUrl || (item.mediumImageUrls && item.mediumImageUrls.length > 0
+            ? item.mediumImageUrls[0].imageUrl
+            : null);
+
+          // ?_ex=128x128 などの解像度指定を削除して高画質化
+          if (imageUrl) {
+            imageUrl = imageUrl.replace(/\?_ex=\d+x\d+/, '');
+          }
+
+          rakutenItem = {
+            itemName: item.itemName,
+            catchcopy: item.catchcopy || '',
+            url: item.affiliateUrl || item.itemUrl,
+            imageUrl: imageUrl
+          };
+
+          // 投稿テキストを作成
+          const tweetText = rakutenItem.itemName + (rakutenItem.catchcopy ? '\n' + rakutenItem.catchcopy : '');
+          text = tweetText.substring(0, 400) + "\n\n" + rakutenItem.url + "\n\n#楽天ROOM #楽天 #楽天市場 #ad #PR";
+          mediaUrl = rakutenItem.imageUrl;
+          mediaType = 'IMAGE';
+        } else {
+          return res.status(404).json({
+            success: false,
+            error: 'No items found from Rakuten API'
+          });
+        }
+      } catch (rakutenError) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch from Rakuten API',
+          message: rakutenError.message
+        });
+      }
+    }
 
     // 環境変数からアクセストークンを取得
     const accessToken = process.env.THREADS_ACCESS_TOKEN;
@@ -131,12 +205,19 @@ module.exports = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
+    const responseData = {
       success: true,
       message: 'Post published successfully',
       postId: publishData.id,
       data: publishData
-    });
+    };
+
+    // 楽天商品の情報がある場合は含める
+    if (rakutenItem) {
+      responseData.rakutenItem = rakutenItem;
+    }
+
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error('Error posting to Threads:', error);

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threads Bot API - Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        button.secondary {
+            background: #28a745;
+        }
+        button.secondary:hover {
+            background: #218838;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 4px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Threads Bot API - テストページ</h1>
+
+        <div class="section">
+            <h2>1. 楽天商品を自動投稿</h2>
+            <p>楽天APIからランダムに商品を取得してThreadsに投稿します</p>
+            <button class="secondary" onclick="postRakuten()">楽天商品を投稿（統合エンドポイント使用）</button>
+            <div id="rakutenResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. テキストのみ投稿</h2>
+            <textarea id="textOnly" placeholder="投稿するテキストを入力..."></textarea>
+            <button onclick="postText()">投稿する</button>
+            <div id="textResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. 画像付き投稿</h2>
+            <textarea id="textWithImage" placeholder="投稿するテキストを入力..."></textarea>
+            <input type="text" id="imageUrl" placeholder="画像URL (例: https://example.com/image.jpg)">
+            <button onclick="postWithImage()">画像付きで投稿</button>
+            <div id="imageResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        async function postRakuten() {
+            const resultDiv = document.getElementById('rakutenResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '投稿中...';
+
+            try {
+                const response = await fetch('/api/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ useRakuten: true })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✅ 投稿成功！</h3>
+                        <p><strong>商品名:</strong> ${data.rakutenItem.itemName}</p>
+                        <p><strong>キャッチコピー:</strong> ${data.rakutenItem.catchcopy}</p>
+                        <p><strong>投稿ID:</strong> ${data.postId}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <h3>❌ エラー</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ エラー</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+
+        async function postText() {
+            const text = document.getElementById('textOnly').value;
+            const resultDiv = document.getElementById('textResult');
+
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '投稿中...';
+
+            try {
+                const response = await fetch('/api/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✅ 投稿成功！</h3>
+                        <p><strong>投稿ID:</strong> ${data.postId}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <h3>❌ エラー</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ エラー</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+
+        async function postWithImage() {
+            const text = document.getElementById('textWithImage').value;
+            const imageUrl = document.getElementById('imageUrl').value;
+            const resultDiv = document.getElementById('imageResult');
+
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+
+            if (!imageUrl) {
+                alert('画像URLを入力してください');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '投稿中...';
+
+            try {
+                const response = await fetch('/api/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text,
+                        mediaUrl: imageUrl,
+                        mediaType: 'IMAGE'
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✅ 投稿成功！</h3>
+                        <p><strong>投稿ID:</strong> ${data.postId}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <h3>❌ エラー</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ エラー</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
